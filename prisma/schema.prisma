@@ -1,0 +1,368 @@
+// Warden - agent runtime schema
+//
+// Design note: nothing here is domain-specific. A Case is whatever unit of work
+// the agent handles (an inbound lead, a support ticket). The guardrail machinery
+// around it - proposed actions, approvals, write-ahead idempotency, audit log,
+// control-arm evals - is the actual product and does not change with the domain.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Connection URLs live in prisma.config.ts (Prisma 7 moved them out of the schema).
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- tenancy
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  users    User[]
+  policies Policy[]
+  cases    Case[]
+  runs     AgentRun[]
+  audit    AuditEvent[]
+  evals    EvalRun[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  authId    String?  @unique @map("auth_id") // supabase auth.users.id
+  email     String
+  name      String?
+  role      UserRole @default(OPERATOR)
+  createdAt DateTime @default(now())
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  approvals Approval[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+enum UserRole {
+  OWNER
+  OPERATOR
+  VIEWER
+}
+
+// ---------------------------------------------------------------- policy
+// Guardrails live here, in data the runtime enforces - not in the prompt.
+// The model cannot talk its way past any of these.
+
+model Policy {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  // hard ceilings
+  maxAttemptsPerCase Int @default(3) @map("max_attempts_per_case")
+  maxActionsPerRun   Int @default(8) @map("max_actions_per_run")
+  maxRunSteps        Int @default(24) @map("max_run_steps")
+
+  // contact windows, evaluated in the CASE's timezone, not the server's
+  contactWindowStartHour Int @default(9)  @map("contact_window_start_hour")
+  contactWindowEndHour   Int @default(20) @map("contact_window_end_hour")
+  contactOnWeekends      Boolean @default(false) @map("contact_on_weekends")
+
+  // Replying to someone who just messaged you is not cold outreach, and the
+  // contact window was never meant to stop it. Within this many minutes of an
+  // inbound message the window does not apply; outside it, it does.
+  // Set to 0 to disable the exemption entirely.
+  inboundReplyGraceMinutes Int @default(30) @map("inbound_reply_grace_minutes")
+
+  // which action types may ever be taken, and which may skip human approval
+  allowedActions     String[] @map("allowed_actions")
+  autoApproveActions String[] @map("auto_approve_actions")
+
+  // Templates a human signed off in advance. The agent may send one of these
+  // with variable substitution without asking again - which is both how you
+  // keep a first response fast, and how India's DLT regime already works:
+  // SMS content is registered and approved before it can ever be sent.
+  // Anything not on this list is free-form and needs a person.
+  approvedTemplates String[] @map("approved_templates")
+
+  // spend ceiling for reversible-but-costly actions, in paise
+  maxValuePerActionPaise Int @default(0) @map("max_value_per_action_paise")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
+  @@map("policies")
+}
+
+// ---------------------------------------------------------------- work
+
+model Case {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  externalId String? @map("external_id") // id in the source system
+  subject    String
+  status     CaseStatus @default(OPEN)
+
+  // contact + locale, needed to enforce contact windows honestly
+  contactName  String?  @map("contact_name")
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  timezone     String   @default("Asia/Kolkata")
+
+  // domain payload. Kept as Json on purpose so the runtime stays domain-agnostic.
+  payload Json @default("{}")
+
+  attemptCount Int @default(0) @map("attempt_count")
+  optedOut     Boolean @default(false) @map("opted_out")
+
+  /// When this person last contacted US. Drives the reactive-reply exemption.
+  lastInboundAt DateTime? @map("last_inbound_at")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs   AgentRun[]
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, status])
+  @@map("cases")
+}
+
+enum CaseStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  ABANDONED
+}
+
+// ---------------------------------------------------------------- runs
+// An AgentRun is durable. It is written before the loop starts and updated as
+// it advances, so a crash mid-run is resumable and never replays side effects.
+
+model AgentRun {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+  caseId   String @map("case_id")
+
+  arm    RunArm   @default(AGENT) // AGENT or CONTROL - the eval lives on this
+  status RunStatus @default(PENDING)
+  seed   String    // common random numbers: same seed across both arms
+
+  stepCount Int @default(0) @map("step_count")
+  error     String?
+
+  // set when the loop parks waiting on a human
+  awaitingActionId String? @map("awaiting_action_id")
+
+  evalRunId String? @map("eval_run_id")
+
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  case    Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  evalRun EvalRun?         @relation(fields: [evalRunId], references: [id], onDelete: SetNull)
+  steps   RunStep[]
+  actions ProposedAction[]
+
+  @@index([tenantId, status])
+  @@index([caseId])
+  @@index([evalRunId])
+  @@map("agent_runs")
+}
+
+enum RunArm {
+  AGENT
+  CONTROL
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  AWAITING_APPROVAL
+  COMPLETED
+  FAILED
+  BLOCKED_BY_POLICY
+}
+
+// One row per step of the loop. This table is what the run-trace UI renders,
+// which is how a judge sees the AI reasoning without reading any code.
+model RunStep {
+  id    String @id @default(uuid())
+  runId String @map("run_id")
+
+  index Int
+  kind  StepKind
+
+  // model-call steps
+  model        String?
+  promptTokens Int?    @map("prompt_tokens")
+  outputTokens Int?    @map("output_tokens")
+  latencyMs    Int?    @map("latency_ms")
+
+  // tool-call steps
+  toolName String? @map("tool_name")
+  toolArgs Json?   @map("tool_args")
+
+  content String? @db.Text
+  detail  Json?
+
+  createdAt DateTime @default(now())
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, index])
+  @@index([runId])
+  @@map("run_steps")
+}
+
+enum StepKind {
+  MODEL_CALL
+  TOOL_CALL
+  TOOL_RESULT
+  POLICY_CHECK
+  ACTION_PROPOSED
+  ACTION_EXECUTED
+  AWAIT_APPROVAL
+  TERMINAL
+}
+
+// ---------------------------------------------------------------- actions
+// The write-ahead record. A row exists here BEFORE any side effect fires, so a
+// crash between "decided" and "did" can never double-execute on resume.
+
+model ProposedAction {
+  id       String @id @default(uuid())
+  runId    String @map("run_id")
+  tenantId String @map("tenant_id")
+
+  type   String // send_email | send_sms | schedule_callback | refund | ...
+  args   Json
+  reason String @db.Text // the agent's stated justification, shown to the approver
+
+  // Deterministic over (tenant, case, type, args). Uniqueness is enforced by the
+  // database, not by application code, so a retry storm cannot get past it.
+  idempotencyKey String @unique @map("idempotency_key")
+
+  status        ActionStatus @default(PROPOSED)
+  valuePaise    Int          @default(0) @map("value_paise")
+  autoApproved  Boolean      @default(false) @map("auto_approved")
+
+  policyVerdict Json?   @map("policy_verdict")
+  result        Json?
+  error         String?
+
+  proposedAt DateTime  @default(now()) @map("proposed_at")
+  decidedAt  DateTime? @map("decided_at")
+  executedAt DateTime? @map("executed_at")
+
+  run      AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  approval Approval?
+
+  @@index([tenantId, status])
+  @@index([runId])
+  @@map("proposed_actions")
+}
+
+enum ActionStatus {
+  PROPOSED
+  BLOCKED
+  APPROVED
+  REJECTED
+  EXECUTED
+  FAILED
+}
+
+model Approval {
+  id       String @id @default(uuid())
+  actionId String @unique @map("action_id")
+  userId   String? @map("user_id")
+
+  decision ApprovalDecision
+  note     String?
+  decidedAt DateTime @default(now()) @map("decided_at")
+
+  action ProposedAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  user   User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("approvals")
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+// ---------------------------------------------------------------- audit
+// Append-only. Never updated, never deleted. The replay tool rebuilds every
+// decision from this table alone.
+
+model AuditEvent {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  entity   String // run | action | case | policy
+  entityId String @map("entity_id")
+  event    String // proposed | approved | executed | blocked | ...
+  actor    String // agent | user:<id> | system
+
+  data Json @default("{}")
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_events")
+}
+
+// ---------------------------------------------------------------- eval
+// The control arm. Same cases, same pre-drawn seeds in both arms, so the only
+// difference between arms is the decisions - not the dice.
+
+model EvalRun {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  label      String
+  caseCount  Int    @map("case_count")
+  status     EvalStatus @default(PENDING)
+
+  // filled in when the run completes
+  agentScore   Float? @map("agent_score")
+  controlScore Float? @map("control_score")
+  lift         Float?
+  agentWins    Int?   @map("agent_wins")
+  controlWins  Int?   @map("control_wins")
+  ties         Int?
+
+  notes String? @db.Text
+
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs   AgentRun[]
+
+  @@index([tenantId])
+  @@map("eval_runs")
+}
+
+enum EvalStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
