@@ -1,0 +1,355 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Warden design tokens.
+
+   One theme, dark, no toggle. This is a console someone stares at for a whole
+   shift next to a terminal; a light mode would be a second surface to keep
+   honest for no operator who asked for it.
+
+   Everything below is a semantic name. Screens should never reach for a raw
+   hex or a stock palette step - if a colour is missing here, it is missing on
+   purpose, or it belongs in this file.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* -- ground ------------------------------------------------------------ */
+  /* Four depths, lightest in the middle. Panels sit ON the canvas; wells sit
+     IN it. Nothing is pure black: #000 next to a bright status pip produces
+     halation on OLED and makes the pip look like it is glowing. */
+  --color-sunken: oklch(0.138 0.008 264); /* #07090c - inset wells: JSON, logs, code */
+  --color-canvas: oklch(0.168 0.008 264); /* #0d0f13 - the page itself */
+  --color-surface: oklch(0.216 0.009 264); /* #181a1e - cards, table body, bars */
+  --color-raised: oklch(0.264 0.01 264); /* #22252a - hover, selected row, inputs */
+
+  /* -- line -------------------------------------------------------------- */
+  /* Structure is carried by hairlines, not shadows. Two weights only. */
+  --color-subtle: oklch(0.31 0.012 264); /* #2d3037 - dividers, card edges */
+  --color-strong: oklch(0.52 0.016 264); /* #646972 - control edges, 3.5:1 on canvas */
+
+  /* -- text -------------------------------------------------------------- */
+  --color-fg: oklch(0.965 0.004 264); /* #f2f3f6 - 15.8:1 on surface */
+  --color-muted: oklch(0.775 0.013 264); /* #b2b6be - 8.6:1, secondary prose */
+  --color-faint: oklch(0.655 0.014 264); /* #8c919a - 5.5:1, labels + column heads */
+
+  /* -- accent ------------------------------------------------------------ */
+  /* Exactly one hue, at 258deg, sitting in the widest empty gap between the
+     state hues so it can never be misread as a status. */
+  --color-accent: oklch(0.66 0.16 258); /* #4f91f2 - fills + focus ring */
+  --color-accent-soft: oklch(0.8 0.1 258); /* #96c0fe - accent as TEXT on dark */
+  --color-on-accent: oklch(0.15 0.01 264); /* #090b0f - text on an accent fill */
+
+  /* -- state ------------------------------------------------------------- */
+  /* The product is a status machine, so these are load-bearing, not decoration.
+     Hues are spread deliberately: 25 / 80 / 143 / 178 / 258 / 302.
+
+     Only one of them is an alarm. A BLOCKED action is the guardrail doing its
+     job and the single most important thing this system does well - painting
+     it red would train operators to read correct behaviour as breakage. It is
+     violet: unmistakable, and not a colour anyone reads as "error".
+
+     REJECTED and FAILED share hue 25 and differ only in chroma, which is the
+     point: a human declining is a quiet "no", a crash is a loud one. */
+  --color-state-pending: oklch(0.735 0.018 264); /* #a3a9b5 slate   - nothing has happened yet */
+  --color-state-proposed: oklch(0.835 0.15 80); /* #fcbd43 amber   - waiting on a human */
+  --color-state-running: oklch(0.8 0.1 258); /* #96c0fe blue    - in flight right now */
+  --color-state-approved: oklch(0.82 0.105 178); /* #70dbc4 teal    - signed, not yet fired */
+  --color-state-executed: oklch(0.835 0.16 143); /* #86e381 green   - it happened */
+  --color-state-blocked: oklch(0.79 0.126 302); /* #caa7fe violet  - policy stopped it */
+  --color-state-rejected: oklch(0.76 0.042 25); /* #cba7a4 clay    - a human said no */
+  --color-state-failed: oklch(0.755 0.144 25); /* #fe8880 red     - it broke */
+
+  /* Back-compat aliases so `bg-background` / `text-foreground` keep meaning
+     something. Prefer canvas/fg in new code. */
+  --color-background: var(--color-canvas);
+  --color-foreground: var(--color-fg);
+
+  /* -- type -------------------------------------------------------------- */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", "Menlo",
+    "Consolas", monospace;
+  --default-font-family: var(--font-sans);
+  --default-mono-font-family: var(--font-mono);
+
+  /* The whole scale is shifted one step down from Tailwind's default: `text-sm`
+     is 13px and is the body size, `text-base` is 14px. A console fits a third
+     more rows per screen at 13px and nobody reads it from across the room. */
+  --text-2xs: 0.6875rem; /* 11 - column heads, chips, pill labels */
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.06em;
+  --text-xs: 0.75rem; /* 12 - dense metadata, timestamps */
+  --text-xs--line-height: 1.0625rem;
+  --text-sm: 0.8125rem; /* 13 - BODY. table cells, prose */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem; /* 14 - emphasis inside a row */
+  --text-base--line-height: 1.375rem;
+  --text-lg: 1rem; /* 16 - card titles */
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.125rem; /* 18 - page titles */
+  --text-xl--line-height: 1.625rem;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 1.375rem; /* 22 */
+  --text-2xl--line-height: 1.75rem;
+  --text-2xl--letter-spacing: -0.015em;
+  --text-3xl: 1.75rem; /* 28 - stat values */
+  --text-3xl--line-height: 2rem;
+  --text-3xl--letter-spacing: -0.02em;
+  --text-4xl: 2.25rem; /* 36 - section-leading numerals */
+  --text-4xl--line-height: 2.5rem;
+  --text-4xl--letter-spacing: -0.025em;
+  --text-5xl: 3rem; /* 48 - stat tiles that carry a screen */
+  --text-5xl--line-height: 1;
+  --text-5xl--letter-spacing: -0.03em;
+  --text-6xl: 4rem; /* 64 - the one number on the evidence page */
+  --text-6xl--line-height: 0.95;
+  --text-6xl--letter-spacing: -0.035em;
+
+  /* -- shape ------------------------------------------------------------- */
+  /* Tight. Big radii read as consumer software and waste edge pixels. */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* The only shadow in the system, and only for things that float over the
+     page. Everything else separates with a border. */
+  --shadow-overlay: 0 16px 40px -12px oklch(0 0 0 / 0.7),
+    0 0 0 1px var(--color-subtle);
+
+  /* -- motion ------------------------------------------------------------ */
+  /* One curve family, so every moving thing in the product shares a physics.
+     Expo-out: leaves immediately and settles long. The built-in CSS easings
+     are too weak to read as intentional at these durations.
+
+     Nothing here uses ease-in. It withholds movement at exactly the moment a
+     user is watching hardest, which reads as lag even at identical duration. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* Durations. Everything interactive stays under 300ms; an operator opens
+     this thirty times a day and a slow console is worse than a plain one. */
+  --dur-press: 140ms;
+  --dur-fast: 180ms;
+  --dur-base: 240ms;
+  --dur-slow: 320ms;
+
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-pip: pip 1.6s ease-in-out infinite;
+  --animate-rail: rail 480ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  @keyframes pip {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  /* The trace rail draws downward as the run advances, so a reader watching a
+     recording sees the agent extending its own history rather than a list
+     that was always there. */
+  @keyframes rail {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+}
+
+@layer base {
+  /* Tailwind v4 defaults every border to currentColor, which makes an unstyled
+     `border` land as near-white. Point it at the hairline token instead so the
+     common case is correct without anyone naming a colour. */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-subtle);
+  }
+
+  html {
+    /* Commits native widgets - scrollbars, date pickers, autofill - to dark. */
+    color-scheme: dark;
+    scrollbar-color: var(--color-strong) transparent;
+    scrollbar-width: thin;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
+    color: var(--color-fg);
+  }
+
+  /* One focus treatment for the whole app. Components may tighten the offset;
+     none of them should turn it off. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-subtle);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-strong);
+    background-clip: content-box;
+  }
+
+  /* Every number in this product is machine-generated, and a column of them
+     only scans if the digits line up. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Lining tabular figures in the sans face too. Proportional digits make a
+     stat tile jitter as it counts, and make a column of counts fail to align
+     even when every row is the same width. */
+  table,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  /* Browser surfaces the design still owns. */
+  ::-moz-selection {
+    background-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
+    color: var(--color-fg);
+  }
+
+  html {
+    caret-color: var(--color-accent);
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: from-font;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Entrance motion.
+
+   These are CSS, not Motion, on purpose. Entrances fire while the page is
+   still hydrating and fetching, which is exactly when the main thread is
+   busiest - and a requestAnimationFrame animation drops frames there while a
+   CSS one does not. Motion is reserved for what CSS cannot do: interruptible,
+   state-driven change (a card leaving the approval queue, a step appending to
+   a live trace).
+
+   `--i` is the stagger index. 55ms between items: far enough to read as a
+   cascade, short enough that the last row of a 12-row table still lands
+   inside 700ms. Nothing here blocks interaction while it plays.
+--------------------------------------------------------------------------- */
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* `backwards` holds the from-state through the delay. Without it a staggered
+   row is briefly painted at full opacity before snapping out to start, which
+   reads as a flash on every page load. */
+@utility enter-rise {
+  animation: enter-rise var(--dur-slow) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+@utility enter-fade {
+  animation: enter-fade var(--dur-base) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+/* Press feedback. Subtle on purpose - 0.97 is felt rather than seen, and
+   anything deeper reads as a toy on an operator tool. */
+@utility pressable {
+  transition: transform var(--dur-press) var(--ease-out);
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+/* The shimmer is a moving gradient rather than an opacity pulse, so a page of
+   skeletons reads as one loading surface instead of twenty blinking boxes. */
+@utility shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-surface) 0%,
+    var(--color-raised) 40%,
+    var(--color-raised) 60%,
+    var(--color-surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* Reduced motion means gentler, not absent. Opacity still carries "this is
+   new" and "this is loading"; what goes is displacement and scale, which are
+   what actually trigger vestibular symptoms. A blanket duration:0 would also
+   strip the loading shimmer, leaving no signal that anything is happening. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes enter-rise {
+    from {
+      opacity: 0;
+      transform: none;
+    }
+  }
+
+  .pressable:active {
+    transform: none;
+  }
+
+  *,
+  ::before,
+  ::after {
+    animation-delay: 0ms !important;
+    transition-duration: 120ms !important;
+  }
+
+  [data-rail] {
+    animation: none !important;
+  }
+}
