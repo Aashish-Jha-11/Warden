@@ -1,0 +1,211 @@
+{
+  "count": 2000,
+  "masterSeed": "warden-v1",
+  "arms": [
+    {
+      "arm": "agent_v1",
+      "conversions": 404,
+      "rate": 0.202
+    },
+    {
+      "arm": "agent_v2",
+      "conversions": 523,
+      "rate": 0.2615
+    },
+    {
+      "arm": "batch",
+      "conversions": 109,
+      "rate": 0.0545
+    },
+    {
+      "arm": "autoresponder",
+      "conversions": 455,
+      "rate": 0.2275
+    }
+  ],
+  "strongestBaseline": "autoresponder",
+  "lift": 1.1494505494505494,
+  "pointGain": 3.4000000000000004,
+  "caseWins": 89,
+  "caseLosses": 21,
+  "caseTies": 1890,
+  "batches": [
+    {
+      "index": 0,
+      "agentRate": 0.3,
+      "baselineRate": 0.27,
+      "agentWon": true
+    },
+    {
+      "index": 1,
+      "agentRate": 0.19,
+      "baselineRate": 0.2,
+      "agentWon": false
+    },
+    {
+      "index": 2,
+      "agentRate": 0.25,
+      "baselineRate": 0.22,
+      "agentWon": true
+    },
+    {
+      "index": 3,
+      "agentRate": 0.24,
+      "baselineRate": 0.17,
+      "agentWon": true
+    },
+    {
+      "index": 4,
+      "agentRate": 0.21,
+      "baselineRate": 0.17,
+      "agentWon": true
+    },
+    {
+      "index": 5,
+      "agentRate": 0.23,
+      "baselineRate": 0.21,
+      "agentWon": true
+    },
+    {
+      "index": 6,
+      "agentRate": 0.33,
+      "baselineRate": 0.25,
+      "agentWon": true
+    },
+    {
+      "index": 7,
+      "agentRate": 0.37,
+      "baselineRate": 0.3,
+      "agentWon": true
+    },
+    {
+      "index": 8,
+      "agentRate": 0.25,
+      "baselineRate": 0.23,
+      "agentWon": true
+    },
+    {
+      "index": 9,
+      "agentRate": 0.28,
+      "baselineRate": 0.26,
+      "agentWon": true
+    },
+    {
+      "index": 10,
+      "agentRate": 0.21,
+      "baselineRate": 0.18,
+      "agentWon": true
+    },
+    {
+      "index": 11,
+      "agentRate": 0.24,
+      "baselineRate": 0.2,
+      "agentWon": true
+    },
+    {
+      "index": 12,
+      "agentRate": 0.31,
+      "baselineRate": 0.29,
+      "agentWon": true
+    },
+    {
+      "index": 13,
+      "agentRate": 0.32,
+      "baselineRate": 0.27,
+      "agentWon": true
+    },
+    {
+      "index": 14,
+      "agentRate": 0.22,
+      "baselineRate": 0.2,
+      "agentWon": true
+    },
+    {
+      "index": 15,
+      "agentRate": 0.34,
+      "baselineRate": 0.31,
+      "agentWon": true
+    },
+    {
+      "index": 16,
+      "agentRate": 0.26,
+      "baselineRate": 0.18,
+      "agentWon": true
+    },
+    {
+      "index": 17,
+      "agentRate": 0.24,
+      "baselineRate": 0.25,
+      "agentWon": false
+    },
+    {
+      "index": 18,
+      "agentRate": 0.18,
+      "baselineRate": 0.15,
+      "agentWon": true
+    },
+    {
+      "index": 19,
+      "agentRate": 0.26,
+      "baselineRate": 0.24,
+      "agentWon": true
+    }
+  ],
+  "batchesLost": 2,
+  "segments": [
+    {
+      "name": "in-window (9:00-20:00)",
+      "count": 1430,
+      "agentRate": 0.25664335664335663,
+      "baselineRate": 0.22587412587412586
+    },
+    {
+      "name": "overnight",
+      "count": 570,
+      "agentRate": 0.2736842105263158,
+      "baselineRate": 0.23157894736842105
+    }
+  ],
+  "sensitivity": [
+    {
+      "label": "TAU=31min",
+      "lift": 1.134065934065934
+    },
+    {
+      "label": "TAU=45min",
+      "lift": 1.1494505494505494
+    },
+    {
+      "label": "TAU=59min",
+      "lift": 1.1582417582417583
+    },
+    {
+      "label": "generic=0.65",
+      "lift": 1.3655352480417755
+    },
+    {
+      "label": "generic=0.78",
+      "lift": 1.1494505494505494
+    },
+    {
+      "label": "generic=0.90",
+      "lift": 1.0315581854043392
+    },
+    {
+      "label": "misfire=0%",
+      "lift": 1.2065934065934067
+    },
+    {
+      "label": "misfire=12%",
+      "lift": 1.1494505494505494
+    },
+    {
+      "label": "misfire=25%",
+      "lift": 1.0835164835164834
+    },
+    {
+      "label": "misfire=40%",
+      "lift": 0.9956043956043956
+    }
+  ]
+}
