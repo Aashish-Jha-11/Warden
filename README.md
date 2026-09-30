@@ -43,7 +43,7 @@ only difference between arms is the decisions, not the dice.
 | Framework | Next.js 16 (App Router), React 19, TypeScript |
 | Styling | Tailwind CSS 4 |
 | Database | Postgres via Supabase, Prisma 7 with the `pg` driver adapter |
-| Model | Groq or Gemini via the Vercel AI SDK |
+| Model | Groq, Gemini or OpenRouter via the Vercel AI SDK |
 | Tests | Vitest |
 
 One deployable. There is no separate API service, because a second service
@@ -63,6 +63,10 @@ src/lib/agent/
   audit.ts         append-only log
   seed.ts          common random numbers for eval arms
 prisma/schema.prisma
+prisma/rls.sql     closes Supabase's REST API over every table
+src/app/(app)/     the console: inbox, approvals, run trace, eval, voice
+src/app/api/       lead webhook, approval decisions, run advance, case detail, voice turn
+scripts/           seed, replay, eval, eval:report, check:model, demo:run
 ```
 
 `policy.ts` has no I/O and no model access on purpose: it is a pure function of
@@ -98,6 +102,7 @@ Two connection strings, and they are not interchangeable:
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm replay              # re-derive every recorded policy verdict; non-zero on drift
 ```
 
 ---
@@ -172,7 +177,10 @@ number smaller.
 ## Status
 
 In: runtime core, policy engine, write-ahead execution, audit log, lead domain
-model, eval harness with control arms, 40 tests.
+model, eval harness with control arms; the inbox, the approval queue, the run
+trace, the evidence page and a browser-speech voice front door; a public lead
+webhook; Google sign-in that provisions a workspace per account; the replay
+tool; 41 tests.
 
-Next: approval queue and run-trace UI, the replay tool, and wiring the real
-message providers behind the executors.
+Next: wiring real message providers behind the executors. Today they return
+what they would have sent and send nothing.
