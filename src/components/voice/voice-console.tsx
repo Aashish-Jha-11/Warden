@@ -544,9 +544,9 @@ function DialIcon({ phase }: { phase: Phase }) {
  * error page from a proxy - throws inside json(), and reporting that as "the
  * network failed" sends whoever is demoing to go and look at their wifi. And a
  * 401, which in production is written by the middleware rather than by the
- * route and carries `{ error: "unauthenticated" }` - a true statement, and a
- * useless thing to put in front of a person mid-sentence. So the status is read
- * first and the body only where it can actually say something better.
+ * route, in wording meant for any API caller rather than for a person
+ * mid-sentence. So the status is read first and the body only where it can
+ * actually say something better.
  */
 async function readTurn(response: Response): Promise<VoiceTurnResponse> {
   if (response.status === 401) {

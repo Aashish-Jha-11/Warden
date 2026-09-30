@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import type { ApiErr } from "@/lib/api/respond";
+
 /**
  * Session refresh, and the one place that decides whether a request is allowed
  * to reach a route at all.
@@ -129,9 +131,20 @@ function carryCookies(from: NextResponse, to: NextResponse): NextResponse {
   return to;
 }
 
+/**
+ * The envelope every route answers in, because this reaches the same callers
+ * they do. The console reads `error` as the sentence to show, so the bare
+ * token this used to send - "unauthenticated" - was what an operator whose
+ * session had lapsed saw under the Approve button. Same wording as
+ * unauthorized() in respond.ts, which cannot be imported here: it pulls in
+ * node:crypto, and this runs at the edge.
+ */
 function json401(from: NextResponse): NextResponse {
   return carryCookies(
     from,
-    NextResponse.json({ error: "unauthenticated", detail: "Sign in at /login." }, { status: 401 }),
+    NextResponse.json<ApiErr>(
+      { ok: false, error: "Sign in to use this endpoint." },
+      { status: 401 },
+    ),
   );
 }
