@@ -48,21 +48,33 @@ const LIVE_RUN_STATUSES: RunStatus[] = ["PENDING", "RUNNING", "AWAITING_APPROVAL
 
 const trimmed = (max: number) => z.string().trim().max(max);
 
+/**
+ * An optional field the sender left blank is one it did not send.
+ *
+ * `null`, "" and "   " are how CRMs and form builders say "not on file", far
+ * more often than they omit the key. Refusing the enquiry over one of them
+ * answers with the 400 that tells the sender to stop retrying, so the lead is
+ * lost because nobody filled in an optional email box - and the inbox's own
+ * demo panel sends `contactName: null` for its Instagram preset. A value that
+ * is present and malformed is still refused: that is a mistake the sender can
+ * fix, and dropping it quietly would hide it from them.
+ */
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (isBlank(value) ? undefined : value), schema.optional());
+
 const IngestSchema = z.object({
   tenantSlug: trimmed(64).min(1),
   source: LeadSourceSchema,
   message: trimmed(4000).min(1),
-  // `nullish`, not `optional`: a CRM with no service on file sends `null` far
-  // more often than it omits the key.
-  service: trimmed(160).nullish(),
-  city: trimmed(80).optional(),
-  contactName: trimmed(120).optional(),
-  contactPhone: trimmed(32).optional(),
-  contactEmail: z.email().max(200).optional(),
-  timezone: trimmed(64).optional(),
-  urgency: UrgencySchema.optional(),
-  budgetSignal: BudgetSignalSchema.optional(),
-  externalId: trimmed(128).optional(),
+  service: optional(trimmed(160)),
+  city: optional(trimmed(80)),
+  contactName: optional(trimmed(120)),
+  contactPhone: optional(trimmed(32)),
+  contactEmail: optional(z.email().max(200)),
+  timezone: optional(trimmed(64)),
+  urgency: optional(UrgencySchema),
+  budgetSignal: optional(BudgetSignalSchema),
+  externalId: optional(trimmed(128)),
 });
 
 type IngestBody = z.infer<typeof IngestSchema>;
@@ -294,6 +306,10 @@ function derivedExternalId(tenantId: string, body: IngestBody): string {
   // Prefixed so it is obvious in the console that we minted this and the source
   // system has no such id to look up.
   return `wh_${digest}`;
+}
+
+function isBlank(value: unknown): boolean {
+  return value === null || (typeof value === "string" && value.trim() === "");
 }
 
 /** Same try/catch shape policy.ts uses, and for the same reason: Intl throws. */
