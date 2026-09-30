@@ -76,9 +76,16 @@ why its verdict can be shown to a user as a list of named checks.
 ```bash
 pnpm install
 cp .env.example .env     # fill in Supabase + a model provider key
-pnpm db:push             # push the schema (uses DIRECT_URL)
+pnpm db:setup            # push the schema and lock the tables (uses DIRECT_URL)
 pnpm dev
 ```
+
+`db:setup`, never `db:push` on its own. Supabase serves every table in `public`
+over its REST API to anyone holding the anon key, and that key ships in the
+browser bundle. `db:push` creates the tables and leaves them readable there;
+`db:setup` also applies `prisma/rls.sql`, which turns on row level security
+with no policies, so that API sees nothing. Prisma connects as the table owner
+and is unaffected.
 
 Two connection strings, and they are not interchangeable:
 
