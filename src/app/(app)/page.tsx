@@ -5,6 +5,7 @@ import { InboxStats, InboxStatsSkeleton } from "@/components/inbox/inbox-stats";
 import { IngestDemo } from "@/components/inbox/ingest-demo";
 import { LeadTable, LeadTableSkeleton } from "@/components/inbox/lead-table";
 import type { InboxCase } from "@/components/inbox/lead-row";
+import { CONTACT_ACTIONS } from "@/lib/agent/types";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
@@ -13,8 +14,12 @@ export const dynamic = "force-dynamic";
 /** The business day is cut in IST: this is an India product and the operator is here. */
 const BUSINESS_TZ = "Asia/Kolkata";
 
-/** Actions that actually reach a person - the ones a response time is measured from. */
-const CONTACT_TYPES = ["send_templated_reply", "send_email", "send_sms", "place_call"];
+/**
+ * Actions that actually reach a person - the ones a response time is measured
+ * from. Spread from the set policy and the runtime share rather than listed: a
+ * channel added there and missing here is a reply this figure never counts.
+ */
+const CONTACT_TYPES = [...CONTACT_ACTIONS];
 
 /**
  * The audit event the runtime writes when policy refuses a proposal.

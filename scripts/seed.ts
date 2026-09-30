@@ -58,7 +58,7 @@ import { idempotencyKey } from "@/lib/agent/idempotency";
 import { evaluatePolicy } from "@/lib/agent/policy";
 import { advanceRun } from "@/lib/agent/runtime";
 import { rngFor } from "@/lib/agent/seed";
-import type { Proposal } from "@/lib/agent/types";
+import { CONTACT_ACTIONS, type Proposal } from "@/lib/agent/types";
 import { DEFAULT_POLICY } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { scoreLead, type LeadPayload } from "@/lib/domain/lead";
@@ -1240,7 +1240,7 @@ async function medianFirstResponseSeconds(tenantId: string): Promise<number | nu
       JOIN agent_runs r ON r.id = pa.run_id
       WHERE r.case_id = c.id
         AND pa.status = 'EXECUTED'
-        AND pa.type = ANY(ARRAY['send_templated_reply','send_email','send_sms','place_call'])
+        AND pa.type = ANY(${[...CONTACT_ACTIONS]})
     ) x ON TRUE
     WHERE c.tenant_id = ${tenantId}
       AND c.last_inbound_at IS NOT NULL
