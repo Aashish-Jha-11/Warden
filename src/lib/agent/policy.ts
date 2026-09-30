@@ -90,31 +90,34 @@ export function evaluatePolicy(args: {
     const reactive = graceMs > 0 && sinceInbound >= 0 && sinceInbound <= graceMs;
 
     if (reactive) {
+      // Exempt from the window and from nothing else. This used to return
+      // straight to the template check, which skipped the spend ceiling for
+      // exactly the replies that go out with nobody reading them first - and
+      // valuePaise is a number the model chooses.
       pass(
         "contact_window",
         `Reactive reply, ${Math.round(sinceInbound / 60_000)}min after their message.`,
       );
-      return finish();
+    } else {
+      const local = localTimeIn(kase.timezone, now);
+      if (!local) {
+        return block("contact_window", `Unusable timezone "${kase.timezone}".`);
+      }
+      if (!policy.contactOnWeekends && local.isWeekend) {
+        return block(
+          "contact_window",
+          `Local time is ${local.label}; weekend contact is off for this tenant.`,
+        );
+      }
+      const { contactWindowStartHour: start, contactWindowEndHour: end } = policy;
+      if (local.hour < start || local.hour >= end) {
+        return block(
+          "contact_window",
+          `Local time is ${local.label}; window is ${start}:00-${end}:00.`,
+        );
+      }
+      pass("contact_window", `Local time ${local.label}`);
     }
-
-    const local = localTimeIn(kase.timezone, now);
-    if (!local) {
-      return block("contact_window", `Unusable timezone "${kase.timezone}".`);
-    }
-    if (!policy.contactOnWeekends && local.isWeekend) {
-      return block(
-        "contact_window",
-        `Local time is ${local.label}; weekend contact is off for this tenant.`,
-      );
-    }
-    const { contactWindowStartHour: start, contactWindowEndHour: end } = policy;
-    if (local.hour < start || local.hour >= end) {
-      return block(
-        "contact_window",
-        `Local time is ${local.label}; window is ${start}:00-${end}:00.`,
-      );
-    }
-    pass("contact_window", `Local time ${local.label}`);
   } else {
     pass("contact_window", "not a contact action");
   }
@@ -128,10 +131,6 @@ export function evaluatePolicy(args: {
   }
   pass("value_ceiling");
 
-  return finish();
-
-  // ---- everything below is the shared tail, reached by both paths ---------
-  function finish(): PolicyVerdict {
   // 7. Templated replies are the one fast path to a person, so the gate on
   //    them is tighter, not looser: the template must be one a human already
   //    signed, and the agent may only fill variables from a fixed list. Free
@@ -192,7 +191,6 @@ export function evaluatePolicy(args: {
   });
 
   return { allowed: true, requiresApproval, checks };
-  }
 }
 
 function isContactAction(type: ActionType | string): boolean {

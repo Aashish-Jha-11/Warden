@@ -190,6 +190,23 @@ describe("reactive reply exemption", () => {
     });
     expect(v.allowed === false && v.blockedBy).toBe("attempt_budget");
   });
+
+  it("is not a bypass for the spend ceiling", () => {
+    // A reactive templated reply goes out with nobody reading it first, and
+    // valuePaise is a number the model picks. The window is waived here; the
+    // ceiling never is.
+    const justNow = new Date(WED_0930_UTC.getTime() - 2 * 60_000);
+    const v = run({
+      proposal: {
+        type: "send_templated_reply",
+        args: { templateId: "first_reply_v1" },
+        valuePaise: 60_000,
+      },
+      policy: { inboundReplyGraceMinutes: 30, maxValuePerActionPaise: 50_000 },
+      kase: { lastInboundAt: justNow, timezone: "America/Los_Angeles" },
+    });
+    expect(v.allowed === false && v.blockedBy).toBe("value_ceiling");
+  });
 });
 
 describe("ceilings", () => {
